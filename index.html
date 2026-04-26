@@ -1,60 +1,20 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>Kirana Receipt</title>
+<title>Smart Kirana Billing</title>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
 <style>
-body {
-  font-family: monospace;
-  background: #f5f5f5;
-}
-
-.receipt {
-  width: 280px;
-  margin: auto;
-  background: white;
-  padding: 10px;
-  border: 1px solid #000;
-}
-
-.center {
-  text-align: center;
-}
-
-hr {
-  border: 1px dashed black;
-}
-
-table {
-  width: 100%;
-  font-size: 14px;
-}
-
-td {
-  padding: 2px 0;
-}
-
-input {
-  width: 100%;
-  border: none;
-  font-family: monospace;
-}
-
-button {
-  margin-top: 10px;
-  width: 100%;
-}
-
-@media print {
-  body {
-    background: white;
-  }
-  button {
-    display: none;
-  }
-}
+body { font-family: monospace; background:#f5f5f5; }
+.receipt { width:300px; margin:auto; background:white; padding:10px; border:1px solid black;}
+.center{text-align:center;}
+hr{border:1px dashed black;}
+table{width:100%; font-size:14px;}
+input,select{width:100%; border:none; font-family:monospace;}
+button{margin-top:5px; width:100%;}
+@media print{button{display:none;}}
 </style>
-
 </head>
 
 <body>
@@ -62,12 +22,13 @@ button {
 <div class="receipt">
 
 <div class="center">
-  <h3>A R SON'S STORE</h3>
-  <div>GROCERY BILL</div>
+<h3>PATEL KIRANA STORE MAILAWADA</h3>
+<div>GROCERY BILL</div>
 </div>
 
 <hr>
 
+Bill No: <span id="billNo"></span><br>
 Date: <input type="date" id="date"><br>
 Customer: <input id="customer">
 
@@ -75,76 +36,184 @@ Customer: <input id="customer">
 
 <table id="table">
 <tr>
-  <td><b>Item</b></td>
-  <td><b>Rate</b></td>
-  <td><b>Qty</b></td>
-  <td><b>Amt</b></td>
+<td><b>Item</b></td>
+<td><b>Rate</b></td>
+<td><b>Qty</b></td>
+<td><b>Amt</b></td>
 </tr>
-
-<tr>
-  <td><input type="text" placeholder="Item name" style="text-align:left;"></td>
-  <td><input type="number"></td>
-  <td><input type="number"></td>
-  <td class="amt">0</td>
-</tr>
-
 </table>
 
 <button onclick="addRow()">+ Add Item</button>
-<button onclick="calculate()">Calculate</button>
 
 <hr>
 
-Bill Total: ₹ <span id="total">0</span><br>
-Prev Balance: ₹ 0<br>
-Adj: ₹ 0
+<b>Total: ₹ <span id="total">0</span></b>
 
 <hr>
 
-<b>NET BAL: ₹ <span id="net">0</span></b>
+<button onclick="saveBill()">Save Bill</button>
+<button onclick="showHistory()">View History</button>
+<button onclick="downloadPDF()">Download PDF</button>
+<button onclick="window.print()">Print</button>
+<button onclick="printBT()">Bluetooth Print</button>
 
 <hr>
 
-<div class="center">
-  THANK YOU! VISIT AGAIN
+<div class="center">THANK YOU! VISIT AGAIN</div>
+
 </div>
 
-<button onclick="window.print()">Print</button>
+<hr>
 
+<div class="receipt">
+<h4>Add Product</h4>
+Name: <input id="pname">
+Rate: <input id="prate" type="number">
+<button onclick="addProduct()">Save Product</button>
 </div>
 
 <script>
 
+// LOAD DATA
+let products = JSON.parse(localStorage.getItem("products")) || {};
+let billCount = localStorage.getItem("billNo") || 1;
+
+document.getElementById("billNo").innerText = billCount;
 document.getElementById("date").valueAsDate = new Date();
 
-function addRow() {
+// ADD PRODUCT
+function addProduct(){
+  let name = document.getElementById("pname").value;
+  let rate = document.getElementById("prate").value;
+
+  if(name && rate){
+    products[name] = rate;
+    localStorage.setItem("products", JSON.stringify(products));
+    alert("Product Saved!");
+  }
+}
+
+// ADD ROW
+function addRow(){
   let table = document.getElementById("table");
   let row = table.insertRow();
 
+  let options = `<option value="">Select</option>`;
+  for(let p in products){
+    options += `<option value="${p}">${p}</option>`;
+  }
+
   row.innerHTML = `
-    <td><input></td>
-    <td><input type="number"></td>
-    <td><input type="number"></td>
+    <td><select onchange="fillRate(this)">${options}</select></td>
+    <td><input class="rate"></td>
+    <td><input class="qty" oninput="calculate()"></td>
     <td class="amt">0</td>
   `;
 }
 
-function calculate() {
+// AUTO FILL RATE
+function fillRate(select){
+  let row = select.parentNode.parentNode;
+  let rate = row.querySelector(".rate");
+
+  rate.value = products[select.value] || 0;
+  calculate();
+}
+
+// CALCULATE
+function calculate(){
   let table = document.getElementById("table");
   let total = 0;
 
-  for (let i = 1; i < table.rows.length; i++) {
-    let rate = table.rows[i].cells[1].children[0].value || 0;
-    let qty = table.rows[i].cells[2].children[0].value || 0;
+  for(let i=1;i<table.rows.length;i++){
+    let rate = table.rows[i].querySelector(".rate").value || 0;
+    let qty = table.rows[i].querySelector(".qty").value || 0;
 
     let amt = rate * qty;
-    table.rows[i].cells[3].innerText = amt;
+    table.rows[i].querySelector(".amt").innerText = amt;
 
     total += amt;
   }
 
   document.getElementById("total").innerText = total;
-  document.getElementById("net").innerText = total;
+}
+
+// SAVE BILL
+function saveBill(){
+  let total = document.getElementById("total").innerText;
+
+  let history = JSON.parse(localStorage.getItem("history")) || [];
+
+  history.push({
+    billNo: billCount,
+    total: total,
+    date: document.getElementById("date").value
+  });
+
+  localStorage.setItem("history", JSON.stringify(history));
+
+  billCount++;
+  localStorage.setItem("billNo", billCount);
+
+  alert("Bill Saved!");
+}
+
+// SHOW HISTORY
+function showHistory(){
+  let history = JSON.parse(localStorage.getItem("history")) || [];
+  let text = "";
+
+  history.forEach(b=>{
+    text += "Bill " + b.billNo + " | ₹" + b.total + " | " + b.date + "\n";
+  });
+
+  alert(text || "No Bills Found");
+}
+
+// PDF DOWNLOAD
+function downloadPDF() {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+
+  let y = 10;
+
+  doc.text("PATEL KIRANA STORE MAILAWADA", 10, y);
+  y += 10;
+
+  doc.text("Date: " + document.getElementById("date").value, 10, y);
+  y += 10;
+
+  let table = document.getElementById("table");
+
+  for (let i = 1; i < table.rows.length; i++) {
+    let item = table.rows[i].querySelector("select")?.value || "";
+    let rate = table.rows[i].querySelector(".rate").value || 0;
+    let qty = table.rows[i].querySelector(".qty").value || 0;
+    let amt = table.rows[i].querySelector(".amt").innerText;
+
+    doc.text(`${item}  ${rate} x ${qty} = ${amt}`, 10, y);
+    y += 8;
+  }
+
+  let total = document.getElementById("total").innerText;
+  y += 10;
+
+  doc.text("Total: ₹ " + total, 10, y);
+
+  doc.save("bill.pdf");
+}
+
+// BLUETOOTH (LIMITED)
+async function printBT() {
+  try {
+    const device = await navigator.bluetooth.requestDevice({
+      acceptAllDevices: true
+    });
+
+    alert("Connected to: " + device.name);
+  } catch (e) {
+    alert("Use PrinterShare app for printing");
+  }
 }
 
 </script>
