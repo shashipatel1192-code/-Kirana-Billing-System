@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Kirana Billing</title>
+  <style>
+    body { font-family: Arial; padding: 15px; background:#f5f5f5; }
+    button { padding:8px; margin:5px; cursor:pointer; }
+    input { padding:8px; margin:5px; }
+    table { width:100%; background:white; margin-top:10px; border-collapse: collapse;}
+    th,td { border:1px solid #ddd; padding:8px; text-align:center; }
+  </style>
+</head>
+<body>
+
+<h2 id="shopName">My Kirana Store</h2>
+
+<input id="customerName" placeholder="Customer Name">
+<input id="customerPhone" placeholder="Phone">
+
+<hr>
+
+<input id="itemName" placeholder="Item name">
+<input id="itemPrice" placeholder="Price">
+<button onclick="addItem()">Add Product</button>
+
+<h3>Products</h3>
+<div id="products"></div>
+
+<h3>Invoice</h3>
+<p>Invoice No: <span id="invoiceNo"></span></p>
+<p>Date: <span id="date"></span></p>
+
+<table>
+<thead>
+<tr><th>Item</th><th>Qty</th><th>Total</th></tr>
+</thead>
+<tbody id="bill"></tbody>
+</table>
+
+<h2>Total ₹<span id="total">0</span></h2>
+
+<button onclick="downloadPDF()">Download PDF</button>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+<script>
+let products = JSON.parse(localStorage.getItem("products")) || [];
+let cart = [];
+let total = 0;
+
+invoiceNo.innerText = Date.now();
+date.innerText = new Date().toLocaleDateString();
+
+function save() {
+  localStorage.setItem("products", JSON.stringify(products));
+}
+
+function addItem() {
+  let name = itemName.value;
+  let price = Number(itemPrice.value);
+  if(!name || !price) return;
+
+  products.push({name, price});
+  save();
+  showProducts();
+}
+
+function showProducts() {
+  productsDiv = document.getElementById("products");
+  productsDiv.innerHTML = "";
+
+  products.forEach((p,i)=>{
+    let btn = document.createElement("button");
+    btn.innerText = p.name+" ₹"+p.price;
+    btn.onclick = ()=>addToCart(i);
+    productsDiv.appendChild(btn);
+  });
+}
+
+function addToCart(i) {
+  let item = cart.find(c=>c.i===i);
+  if(item) item.qty++;
+  else cart.push({i,qty:1});
+  update();
+}
+
+function update() {
+  bill.innerHTML="";
+  total=0;
+
+  cart.forEach(c=>{
+    let p = products[c.i];
+    let t = p.price*c.qty;
+    total += t;
+
+    let row = `<tr>
+      <td>${p.name}</td>
+      <td>${c.qty}</td>
+      <td>₹${t}</td>
+    </tr>`;
+
+    bill.innerHTML += row;
+  });
+
+  document.getElementById("total").innerText = total;
+}
+
+function downloadPDF() {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+
+  let y=10;
+  doc.text(shopName.innerText,10,y); y+=10;
+  doc.text("Customer: "+customerName.value,10,y); y+=8;
+  doc.text("Phone: "+customerPhone.value,10,y); y+=8;
+
+  cart.forEach(c=>{
+    let p=products[c.i];
+    doc.text(`${p.name} x${c.qty} = ₹${p.price*c.qty}`,10,y);
+    y+=8;
+  });
+
+  doc.text("Total ₹"+total,10,y+10);
+  doc.save("bill.pdf");
+}
+
+showProducts();
+</script>
+
+</body>
+</html>
