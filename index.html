@@ -1,130 +1,152 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Kirana Billing</title>
-  <style>
-    body { font-family: Arial; padding: 15px; background:#f5f5f5; }
-    button { padding:8px; margin:5px; cursor:pointer; }
-    input { padding:8px; margin:5px; }
-    table { width:100%; background:white; margin-top:10px; border-collapse: collapse;}
-    th,td { border:1px solid #ddd; padding:8px; text-align:center; }
-  </style>
+<title>Kirana Receipt</title>
+
+<style>
+body {
+  font-family: monospace;
+  background: #f5f5f5;
+}
+
+.receipt {
+  width: 280px;
+  margin: auto;
+  background: white;
+  padding: 10px;
+  border: 1px solid #000;
+}
+
+.center {
+  text-align: center;
+}
+
+hr {
+  border: 1px dashed black;
+}
+
+table {
+  width: 100%;
+  font-size: 14px;
+}
+
+td {
+  padding: 2px 0;
+}
+
+input {
+  width: 100%;
+  border: none;
+  font-family: monospace;
+}
+
+button {
+  margin-top: 10px;
+  width: 100%;
+}
+
+@media print {
+  body {
+    background: white;
+  }
+  button {
+    display: none;
+  }
+}
+</style>
+
 </head>
+
 <body>
 
-<h2 id="shopName">My Kirana Store</h2>
+<div class="receipt">
 
-<input id="customerName" placeholder="Customer Name">
-<input id="customerPhone" placeholder="Phone">
+<div class="center">
+  <h3>A R SON'S STORE</h3>
+  <div>GROCERY BILL</div>
+</div>
 
 <hr>
 
-<input id="itemName" placeholder="Item name">
-<input id="itemPrice" placeholder="Price">
-<button onclick="addItem()">Add Product</button>
+Date: <input type="date" id="date"><br>
+Customer: <input id="customer">
 
-<h3>Products</h3>
-<div id="products"></div>
+<hr>
 
-<h3>Invoice</h3>
-<p>Invoice No: <span id="invoiceNo"></span></p>
-<p>Date: <span id="date"></span></p>
+<table id="table">
+<tr>
+  <td><b>Item</b></td>
+  <td><b>Rate</b></td>
+  <td><b>Qty</b></td>
+  <td><b>Amt</b></td>
+</tr>
 
-<table>
-<thead>
-<tr><th>Item</th><th>Qty</th><th>Total</th></tr>
-</thead>
-<tbody id="bill"></tbody>
+<tr>
+  <td><input></td>
+  <td><input type="number"></td>
+  <td><input type="number"></td>
+  <td class="amt">0</td>
+</tr>
+
 </table>
 
-<h2>Total ₹<span id="total">0</span></h2>
+<button onclick="addRow()">+ Add Item</button>
+<button onclick="calculate()">Calculate</button>
 
-<button onclick="downloadPDF()">Download PDF</button>
+<hr>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+Bill Total: ₹ <span id="total">0</span><br>
+Prev Balance: ₹ 0<br>
+Adj: ₹ 0
+
+<hr>
+
+<b>NET BAL: ₹ <span id="net">0</span></b>
+
+<hr>
+
+<div class="center">
+  THANK YOU! VISIT AGAIN
+</div>
+
+<button onclick="window.print()">Print</button>
+
+</div>
 
 <script>
-let products = JSON.parse(localStorage.getItem("products")) || [];
-let cart = [];
-let total = 0;
 
-invoiceNo.innerText = Date.now();
-date.innerText = new Date().toLocaleDateString();
+document.getElementById("date").valueAsDate = new Date();
 
-function save() {
-  localStorage.setItem("products", JSON.stringify(products));
+function addRow() {
+  let table = document.getElementById("table");
+  let row = table.insertRow();
+
+  row.innerHTML = `
+    <td><input></td>
+    <td><input type="number"></td>
+    <td><input type="number"></td>
+    <td class="amt">0</td>
+  `;
 }
 
-function addItem() {
-  let name = itemName.value;
-  let price = Number(itemPrice.value);
-  if(!name || !price) return;
+function calculate() {
+  let table = document.getElementById("table");
+  let total = 0;
 
-  products.push({name, price});
-  save();
-  showProducts();
-}
+  for (let i = 1; i < table.rows.length; i++) {
+    let rate = table.rows[i].cells[1].children[0].value || 0;
+    let qty = table.rows[i].cells[2].children[0].value || 0;
 
-function showProducts() {
-  productsDiv = document.getElementById("products");
-  productsDiv.innerHTML = "";
+    let amt = rate * qty;
+    table.rows[i].cells[3].innerText = amt;
 
-  products.forEach((p,i)=>{
-    let btn = document.createElement("button");
-    btn.innerText = p.name+" ₹"+p.price;
-    btn.onclick = ()=>addToCart(i);
-    productsDiv.appendChild(btn);
-  });
-}
-
-function addToCart(i) {
-  let item = cart.find(c=>c.i===i);
-  if(item) item.qty++;
-  else cart.push({i,qty:1});
-  update();
-}
-
-function update() {
-  bill.innerHTML="";
-  total=0;
-
-  cart.forEach(c=>{
-    let p = products[c.i];
-    let t = p.price*c.qty;
-    total += t;
-
-    let row = `<tr>
-      <td>${p.name}</td>
-      <td>${c.qty}</td>
-      <td>₹${t}</td>
-    </tr>`;
-
-    bill.innerHTML += row;
-  });
+    total += amt;
+  }
 
   document.getElementById("total").innerText = total;
+  document.getElementById("net").innerText = total;
 }
 
-function downloadPDF() {
-  const { jsPDF } = window.jspdf;
-  const doc = new jsPDF();
-
-  let y=10;
-  doc.text(shopName.innerText,10,y); y+=10;
-  doc.text("Customer: "+customerName.value,10,y); y+=8;
-  doc.text("Phone: "+customerPhone.value,10,y); y+=8;
-
-  cart.forEach(c=>{
-    let p=products[c.i];
-    doc.text(`${p.name} x${c.qty} = ₹${p.price*c.qty}`,10,y);
-    y+=8;
-  });
-
-  doc.text("Total ₹"+total,10,y+10);
-  doc.save("bill.pdf");
-}
-
-showProducts();
 </script>
 
 </body>
